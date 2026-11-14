@@ -1,8 +1,9 @@
+
 import mapboxgl from 'https://cdn.jsdelivr.net/npm/mapbox-gl@2.15.0/+esm';
 
 console.log('Mapbox GL JS Loaded:', mapboxgl);
 
-mapboxgl.accessToken = 'YOUR_PUBLIC_TOKEN_HERE';
+mapboxgl.accessToken = 'YOUR_PUBLIC_TOKEN';
 
 const map = new mapboxgl.Map({
   container: 'map',
