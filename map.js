@@ -1,8 +1,7 @@
-
 import mapboxgl from 'https://cdn.jsdelivr.net/npm/mapbox-gl@2.15.0/+esm';
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm';
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiYW5oYmFuZzc1OTMiLCJhIjoiY213ZnRwMDF4MDRscTJ6cGx0bXJ2bm1ndiJ9.85sJ23wvmtzR9e_dytBkDA';
+mapboxgl.accessToken = 'YOUR_EXISTING_PK_PUBLIC_TOKEN';
 
 const map = new mapboxgl.Map({
   container: 'map',
@@ -19,14 +18,20 @@ const bikeLaneStyle = {
   'line-opacity': 0.6,
 };
 
+const stationFlow = d3
+  .scaleQuantize()
+  .domain([0, 1])
+  .range([0, 0.5, 1]);
+
 function getCoords(station) {
-  const point = new mapboxgl.LngLat(+station.lon, +station.lat);
+  const point = new mapboxgl.LngLat(
+    Number(station.lon),
+    Number(station.lat)
+  );
+
   const { x, y } = map.project(point);
 
-  return {
-    cx: x,
-    cy: y,
-  };
+  return { cx: x, cy: y };
 }
 
 function computeStationTraffic(stations, trips) {
@@ -83,6 +88,12 @@ function formatTime(minutes) {
   });
 }
 
+function getDepartureRatio(d) {
+  return d.totalTraffic === 0
+    ? 0.5
+    : stationFlow(d.departures / d.totalTraffic);
+}
+
 map.on('load', async () => {
   map.addSource('boston_route', {
     type: 'geojson',
@@ -114,6 +125,11 @@ map.on('load', async () => {
   const selectedTime = document.getElementById('selected-time');
   const anyTimeLabel = document.getElementById('any-time');
 
+  if (!timeSlider || !selectedTime || !anyTimeLabel) {
+    console.error('Time filter elements not found.');
+    return;
+  }
+
   try {
     const jsonData = await d3.json(
       'https://dsc106.com/labs/lab07/data/bluebikes-stations.json'
@@ -134,7 +150,10 @@ map.on('load', async () => {
 
     const radiusScale = d3
       .scaleSqrt()
-      .domain([0, d3.max(allStations, (d) => d.totalTraffic)])
+      .domain([
+        0,
+        d3.max(allStations, (d) => d.totalTraffic) || 1,
+      ])
       .range([0, 25]);
 
     let circles = svg
@@ -145,9 +164,7 @@ map.on('load', async () => {
       .attr('stroke', 'white')
       .attr('stroke-width', 1)
       .attr('fill-opacity', 0.6)
-      .append('title');
-
-    circles = svg.selectAll('circle');
+      .style('--departure-ratio', getDepartureRatio);
 
     function updatePositions() {
       circles
@@ -174,10 +191,10 @@ map.on('load', async () => {
         .data(filteredStations, (d) => d.short_name)
         .join('circle')
         .attr('r', (d) => radiusScale(d.totalTraffic))
-        .attr('fill', 'steelblue')
         .attr('stroke', 'white')
         .attr('stroke-width', 1)
-        .attr('fill-opacity', 0.6);
+        .attr('fill-opacity', 0.6)
+        .style('--departure-ratio', getDepartureRatio);
 
       circles
         .selectAll('title')
@@ -205,11 +222,11 @@ map.on('load', async () => {
       updateScatterPlot(timeFilter);
     }
 
+    timeSlider.addEventListener('input', updateTimeDisplay);
+
     map.on('move', updatePositions);
     map.on('zoom', updatePositions);
     map.on('resize', updatePositions);
-
-    timeSlider.addEventListener('input', updateTimeDisplay);
 
     updateTimeDisplay();
 
